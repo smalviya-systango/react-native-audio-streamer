@@ -47,18 +47,31 @@ RCT_EXPORT_METHOD(setUrl:(NSString *)urlString){
         NSLog(@"Audio session error");
     }
 
-
-    NSURL *url = [[NSURL alloc] initWithString:urlString];
-    _douUrl = [[RNAudioFileURL alloc] init];
-    _douUrl.url = url;
-    _player = [[DOUAudioStreamer alloc] initWithAudioFile:_douUrl];
-
+    NSURL *url;
+    if ([urlString rangeOfString:@"http"].location == NSNotFound) {
+        url = [NSURL fileURLWithPath:urlString];
+        BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:urlString];
+        if (fileExists) {
+            _douUrl = [[RNAudioFileURL alloc] init];
+            _douUrl.url = url;
+            _player = [[DOUAudioStreamer alloc] initWithAudioFile:_douUrl];
+        } else {
+            //send status event with ERROR !
+        }
+    } else {
+        url = [[NSURL alloc] initWithString:urlString];
+        _douUrl = [[RNAudioFileURL alloc] init];
+        _douUrl.url = url;
+        _player = [[DOUAudioStreamer alloc] initWithAudioFile:_douUrl];
+    }
+    
     // Status observer
     [_player addObserver:self
               forKeyPath:@"status"
                  options:NSKeyValueObservingOptionNew
                  context:kStatusKVOKey];
 }
+
 
 RCT_EXPORT_METHOD(play) {
     if(_player) [_player play];

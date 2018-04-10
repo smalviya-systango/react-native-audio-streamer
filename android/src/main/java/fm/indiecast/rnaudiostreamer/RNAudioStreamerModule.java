@@ -27,9 +27,12 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.FileDataSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.List;
@@ -67,21 +70,59 @@ public class RNAudioStreamerModule extends ReactContextBaseJavaModule implements
             this.sendStatusEvent();
         }
 
-        // Create player
-        TrackSelector trackSelector = new DefaultTrackSelector();
-        LoadControl loadControl = new DefaultLoadControl();
-        this.player = ExoPlayerFactory.newSimpleInstance(reactContext, trackSelector, loadControl);
 
-        // Create source
-        ExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
-        DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
-        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(reactContext, getDefaultUserAgent(), bandwidthMeter);
-        Handler mainHandler = new Handler();
-        MediaSource audioSource = new ExtractorMediaSource(Uri.parse(urlString), dataSourceFactory, extractorsFactory, mainHandler, this);
+        if(urlString.contains("http")){
+            // Create player
+            TrackSelector trackSelector = new DefaultTrackSelector();
+            LoadControl loadControl = new DefaultLoadControl();
+            this.player = ExoPlayerFactory.newSimpleInstance(reactContext, trackSelector, loadControl);
 
-        // Start preparing audio
-        player.prepare(audioSource);
-        player.addListener(this);
+            // Create source
+            ExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
+            DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+            DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(reactContext, getDefaultUserAgent(), bandwidthMeter);
+            Handler mainHandler = new Handler();
+            MediaSource audioSource = new ExtractorMediaSource(Uri.parse(urlString), dataSourceFactory, extractorsFactory, mainHandler, this);
+
+            // Start preparing audio
+            player.prepare(audioSource);
+            player.addListener(this);
+        } else{
+
+            File file = new File(urlString);
+            if(file.exists()){
+                Uri uri = Uri.fromFile(file);
+                player = ExoPlayerFactory.newSimpleInstance(reactContext, new DefaultTrackSelector(null), new DefaultLoadControl());
+
+                DataSpec dataSpec = new DataSpec(uri);
+                final FileDataSource fileDataSource = new FileDataSource();
+                try {
+                    fileDataSource.open(dataSpec);
+                } catch (FileDataSource.FileDataSourceException e) {
+                    e.printStackTrace();
+                }
+
+                DataSource.Factory factory = new DataSource.Factory() {
+                    @Override
+                    public DataSource createDataSource() {
+                        return fileDataSource;
+                    }
+                };
+                MediaSource audioSource = new ExtractorMediaSource(fileDataSource.getUri(),
+                        factory, new DefaultExtractorsFactory(), null, null);
+
+                player.prepare(audioSource);
+                player.addListener(this);
+            } else{
+                status = "ERROR";
+                this.sendStatusEvent();
+            }
+
+        }
+
+
+
+
     }
 
     @ReactMethod public void play() {
